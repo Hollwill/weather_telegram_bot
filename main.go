@@ -18,6 +18,14 @@ import (
 
 var botToken string
 
+func initLog() {
+	file, err := os.OpenFile("logs.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.SetOutput(file)
+}
+
 func init() {
 	val, ok := os.LookupEnv("BOT_TOKEN")
 	if ok {
