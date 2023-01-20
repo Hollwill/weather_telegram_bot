@@ -45,7 +45,7 @@ func StartHandler(bot *telego.Bot, update telego.Update) {
 
 	_, _ = bot.SendMessage(tu.Messagef(
 		tu.ID(update.Message.Chat.ID),
-		"Привет, %s! \n Отправь свою локацию чтобы я знал где ты находишься, или я сам тебя по IP вычислю!",
+		"Привет, %s! \n Отправь свою локацию чтобы я знал где ты находишься",
 		update.Message.From.FirstName,
 	).WithReplyMarkup(keyboard),
 	)
@@ -56,28 +56,35 @@ func StartHandler(bot *telego.Bot, update telego.Update) {
 	ctx := context.Background()
 	err := userRepo.Save(ctx, &u)
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
 	}
 }
 
 func LocationHandler(bot *telego.Bot, update telego.Update) {
-	_, _ = bot.SendMessage(
-		tu.Message(
-			tu.ID(update.Message.Chat.ID),
-			`Геолокация успешно сохранена.
-			Введите время для получения рассылки в формате /cron * * * * 
-			Например '/cron 1 * * * *' для получения рассылки каждый час в 1 минуту.`,
-		).WithReplyMarkup(&telego.ReplyKeyboardRemove{RemoveKeyboard: true}),
-	)
-
 	u, err := userRepo.FindByID(context.Background(), int(update.Message.Chat.ID))
 	if err != nil {
-		log.Fatalln(err)
+		log.Println("User not found")
+		_, _ = bot.SendMessage(
+			tu.Message(
+				tu.ID(update.Message.Chat.ID),
+				"Пользователь не найден. Начните с команды /start",
+			),
+		)
+
 	}
 
 	u.Latitude = float32(update.Message.Location.Latitude)
 	u.Longitude = float32(update.Message.Location.Longitude)
 	userRepo.Save(context.Background(), u)
+
+	_, _ = bot.SendMessage(
+		tu.Message(
+			tu.ID(update.Message.Chat.ID),
+			`Геолокация успешно сохранена.
+			Введите время для получения рассылки в формате /crontab * * * * 
+			Например '/crontab 1 * * * *' для получения рассылки каждый час в 1 минуту.`,
+		).WithReplyMarkup(&telego.ReplyKeyboardRemove{RemoveKeyboard: true}),
+	)
 }
 
 func CrontabHandler(bot *telego.Bot, update telego.Update) {
@@ -106,19 +113,26 @@ func CrontabHandler(bot *telego.Bot, update telego.Update) {
 func WeatherHandler(bot *telego.Bot, update telego.Update) {
 	u, err := userRepo.FindByID(context.Background(), int(update.Message.Chat.ID))
 	if err != nil {
-		log.Fatalln(err)
+		log.Println("Пользователь не найден.")
+		_, _ = bot.SendMessage(
+			tu.Message(
+				tu.ID(update.Message.Chat.ID),
+				"Пользователь не найден. Начните с команды /start",
+			),
+		)
+	} else {
+		service := api_services.WeatherApiComService{
+			Coords: structures.Coords{Lat: float64(u.Latitude), Long: float64(u.Longitude)},
+			ApiKey: weatherAPIToken,
+		}
+		parser := service.GetParser()
+
+		weather := parser.Parse(service.FetchData())
+
+		_, _ = bot.SendMessage(tu.Message(
+			tu.ID(update.Message.Chat.ID),
+			fmt.Sprint(weather),
+		))
+
 	}
-
-	service := api_services.WeatherApiComService{
-		Coords: structures.Coords{Lat: float64(u.Latitude), Long: float64(u.Longitude)},
-		ApiKey: weatherAPIToken,
-	}
-	parser := service.GetParser()
-
-	weather := parser.Parse(service.FetchData())
-
-	_, _ = bot.SendMessage(tu.Message(
-		tu.ID(update.Message.Chat.ID),
-		fmt.Sprint(weather),
-	))
 }
