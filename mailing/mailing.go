@@ -4,37 +4,22 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/HollWill/weather/api_services"
 	"github.com/HollWill/weather/structures"
 	"github.com/HollWill/weather_telegram_bot/db/models"
 	"github.com/HollWill/weather_telegram_bot/db/repositories"
+	"github.com/HollWill/weather_telegram_bot/settings"
 	"github.com/go-co-op/gocron"
-	"github.com/jmoiron/sqlx"
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
 )
 
-var (
-	userRepo        models.UserRepository
-	weatherAPIToken string
-	Sheduler        *gocron.Scheduler
-)
+var Sheduler *gocron.Scheduler
 
 func init() {
-	val, ok := os.LookupEnv("WEATHER_API_TOKEN")
-	if ok {
-		weatherAPIToken = val
-	} else {
-		log.Fatalln("Declare WEATHER_API_TOKEN in environment variable")
-	}
-	sdb, err := sqlx.Connect("sqlite3", "weather.db")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	userRepo = repositories.NewSqlUserRepository(sdb)
+	settings.UserRepo = repositories.NewSqlUserRepository(settings.Sdb)
 }
 
 func sendMessage(bot *telego.Bot, user models.User) func() {
@@ -44,7 +29,7 @@ func sendMessage(bot *telego.Bot, user models.User) func() {
 				Lat:  float64(user.Latitude),
 				Long: float64(user.Longitude),
 			},
-			ApiKey: weatherAPIToken,
+			ApiKey: settings.WeatherAPIToken,
 		}
 		parser := service.GetParser()
 
@@ -61,7 +46,7 @@ func Mailing(bot *telego.Bot) {
 	if Sheduler != nil {
 		Sheduler.Clear()
 	}
-	users, err := userRepo.GetAll(context.Background())
+	users, err := settings.UserRepo.GetAll(context.Background())
 	if err != nil {
 		log.Println(err)
 	}

@@ -4,37 +4,16 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
 	"github.com/HollWill/weather/api_services"
 	"github.com/HollWill/weather/structures"
 	"github.com/HollWill/weather_telegram_bot/db/models"
-	"github.com/HollWill/weather_telegram_bot/db/repositories"
 	"github.com/HollWill/weather_telegram_bot/mailing"
-	"github.com/jmoiron/sqlx"
+	"github.com/HollWill/weather_telegram_bot/settings"
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
 )
-
-var (
-	weatherAPIToken string
-	userRepo        models.UserRepository
-)
-
-func init() {
-	val, ok := os.LookupEnv("WEATHER_API_TOKEN")
-	if ok {
-		weatherAPIToken = val
-	} else {
-		log.Fatalln("Declare WEATHER_API_TOKEN in environment variable")
-	}
-	sdb, err := sqlx.Connect("sqlite3", "weather.db")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	userRepo = repositories.NewSqlUserRepository(sdb)
-}
 
 func StartHandler(bot *telego.Bot, update telego.Update) {
 	keyboard := tu.Keyboard(
@@ -54,14 +33,14 @@ func StartHandler(bot *telego.Bot, update telego.Update) {
 	u.ID = int(update.Message.Chat.ID)
 	u.Name = update.Message.From.FirstName
 	ctx := context.Background()
-	err := userRepo.Save(ctx, &u)
+	err := settings.UserRepo.Save(ctx, &u)
 	if err != nil {
 		log.Println(err)
 	}
 }
 
 func LocationHandler(bot *telego.Bot, update telego.Update) {
-	u, err := userRepo.FindByID(context.Background(), int(update.Message.Chat.ID))
+	u, err := settings.UserRepo.FindByID(context.Background(), int(update.Message.Chat.ID))
 	if err != nil {
 		log.Println("User not found")
 		_, _ = bot.SendMessage(
@@ -75,7 +54,7 @@ func LocationHandler(bot *telego.Bot, update telego.Update) {
 
 	u.Latitude = float32(update.Message.Location.Latitude)
 	u.Longitude = float32(update.Message.Location.Longitude)
-	userRepo.Save(context.Background(), u)
+	settings.UserRepo.Save(context.Background(), u)
 
 	_, _ = bot.SendMessage(
 		tu.Message(
@@ -91,15 +70,13 @@ func CrontabHandler(bot *telego.Bot, update telego.Update) {
 	_, args := tu.ParseCommand(update.Message.Text)
 	strings.Join(args, " ")
 
-	u, err := userRepo.FindByID(context.Background(), int(update.Message.Chat.ID))
+	u, err := settings.UserRepo.FindByID(context.Background(), int(update.Message.Chat.ID))
 	if err != nil {
 		log.Println(err)
 	}
 
 	u.CronTab = strings.Join(args, " ")
-	userRepo.Save(context.Background(), u)
-
-	fmt.Println(userRepo.GetAll(context.Background()))
+	settings.UserRepo.Save(context.Background(), u)
 
 	go mailing.Mailing(bot)
 	_, _ = bot.SendMessage(
@@ -111,7 +88,7 @@ func CrontabHandler(bot *telego.Bot, update telego.Update) {
 }
 
 func WeatherHandler(bot *telego.Bot, update telego.Update) {
-	u, err := userRepo.FindByID(context.Background(), int(update.Message.Chat.ID))
+	u, err := settings.UserRepo.FindByID(context.Background(), int(update.Message.Chat.ID))
 	if err != nil {
 		log.Println("Пользователь не найден.")
 		_, _ = bot.SendMessage(
@@ -123,7 +100,7 @@ func WeatherHandler(bot *telego.Bot, update telego.Update) {
 	} else {
 		service := api_services.WeatherApiComService{
 			Coords: structures.Coords{Lat: float64(u.Latitude), Long: float64(u.Longitude)},
-			ApiKey: weatherAPIToken,
+			ApiKey: settings.WeatherAPIToken,
 		}
 		parser := service.GetParser()
 
