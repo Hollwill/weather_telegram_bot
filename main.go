@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
@@ -14,9 +13,8 @@ import (
 	"github.com/HollWill/weather_telegram_bot/handlers"
 	"github.com/HollWill/weather_telegram_bot/mailing"
 	"github.com/HollWill/weather_telegram_bot/predicates"
+	"github.com/HollWill/weather_telegram_bot/settings"
 )
-
-var botToken string
 
 func initLog() {
 	file, err := os.OpenFile("logs.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -27,21 +25,12 @@ func initLog() {
 }
 
 func init() {
-	val, ok := os.LookupEnv("BOT_TOKEN")
-	if ok {
-		botToken = val
-	} else {
-		log.Fatalln("Declare BOT_TOKEN in environment variable")
-	}
-	sdb, err := sqlx.Connect("sqlite3", "weather.db")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	sqlstore.CreateTables(sdb)
+	sqlstore.CreateTables(settings.Sdb)
+	initLog()
 }
 
 func main() {
-	bot, err := telego.NewBot(botToken, telego.WithDefaultLogger(false, false))
+	bot, err := telego.NewBot(settings.BotToken, telego.WithDefaultLogger(false, false))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
