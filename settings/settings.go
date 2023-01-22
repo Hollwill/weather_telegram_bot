@@ -6,7 +6,6 @@ import (
 
 	"github.com/HollWill/weather_telegram_bot/db/models"
 	"github.com/HollWill/weather_telegram_bot/db/repositories"
-	"github.com/HollWill/weather_telegram_bot/settings"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -48,5 +47,5 @@ func init() {
 	initDb()
 	initWeatherApiToken()
 
-	UserRepo = repositories.NewSqlUserRepository(settings.Sdb)
+	UserRepo = repositories.NewSqlUserRepository(Sdb)
 }
